@@ -1,0 +1,28 @@
+[package]
+name = "horizon-native"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "horizon_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+winit = { version = "0.30", features = ["android-native-activity"] }
+wgpu = { version = "23", default-features = false, features = ["vulkan", "gles", "wgsl"] }
+android-activity = { version = "0.6", features = ["native-activity"] }
+pollster = "0.4"
+bytemuck = { version = "1", features = ["derive"] }
+log = "0.4"
+android_logger = "0.14"
+
+[package.metadata.android]
+package_name = "horizon-native"
+build_targets = ["aarch64-linux-android"]
+
+[package.metadata.android.sdk]
+min_sdk_version = 26
+target_sdk_version = 34
+
+[package.metadata.android.application]
+label = "Horizon Native"
