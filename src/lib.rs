@@ -24,17 +24,23 @@ struct Uniforms {
 }
 
 const CUBE: [[f32; 3]; 8] = [
-    [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0],
-    [0.0, 0.0, 1.0], [1.0, 0.0, 1.0], [1.0, 1.0, 1.0], [0.0, 1.0, 1.0],
+    [0.0, 0.0, 0.0],
+    [1.0, 0.0, 0.0],
+    [1.0, 1.0, 0.0],
+    [0.0, 1.0, 0.0],
+    [0.0, 0.0, 1.0],
+    [1.0, 0.0, 1.0],
+    [1.0, 1.0, 1.0],
+    [0.0, 1.0, 1.0],
 ];
 
 const FACES: [([u16; 4], [f32; 3]); 6] = [
-    ([4, 5, 6, 7], [1.0, 0.9, 0.5]),
-    ([1, 0, 3, 2], [0.5, 0.9, 1.0]),
-    ([3, 2, 6, 7], [1.0, 0.5, 0.5]),
-    ([0, 1, 5, 4], [0.3, 0.3, 0.3]),
-    ([5, 6, 2, 1], [0.5, 1.0, 0.5]),
-    ([0, 4, 7, 3], [0.9, 0.9, 0.9]),
+    ([4, 5, 6, 7], [1.00, 0.90, 0.50]),
+    ([1, 0, 3, 2], [0.50, 0.90, 1.00]),
+    ([3, 2, 6, 7], [1.00, 0.50, 0.50]),
+    ([0, 1, 5, 4], [0.30, 0.30, 0.30]),
+    ([5, 6, 2, 1], [0.50, 1.00, 0.50]),
+    ([0, 4, 7, 3], [0.90, 0.90, 0.90]),
 ];
 
 fn build_mesh() -> (Vec<Vertex>, Vec<u16>) {
@@ -43,11 +49,23 @@ fn build_mesh() -> (Vec<Vertex>, Vec<u16>) {
     for (corners, color) in FACES.iter() {
         let base = verts.len() as u16;
         for c in corners.iter() {
-            verts.push(Vertex { pos: CUBE[*c as usize], color: *color });
+            verts.push(Vertex {
+                pos: CUBE[*c as usize],
+                color: *color,
+            });
         }
         idx.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
     }
     (verts, idx)
+}
+
+fn identity() -> [[f32; 4]; 4] {
+    let mut m = [[0.0f32; 4]; 4];
+    m[0][0] = 1.0;
+    m[1][1] = 1.0;
+    m[2][2] = 1.0;
+    m[3][3] = 1.0;
+    m
 }
 
 fn mat_mul(a: [[f32; 4]; 4], b: [[f32; 4]; 4]) -> [[f32; 4]; 4] {
@@ -56,7 +74,7 @@ fn mat_mul(a: [[f32; 4]; 4], b: [[f32; 4]; 4]) -> [[f32; 4]; 4] {
         for j in 0..4 {
             let mut s = 0.0;
             for k in 0..4 {
-                s += a[k][j] * b[i][k];
+                s += a[i][k] * b[k][j];
             }
             r[i][j] = s;
         }
@@ -64,28 +82,53 @@ fn mat_mul(a: [[f32; 4]; 4], b: [[f32; 4]; 4]) -> [[f32; 4]; 4] {
     r
 }
 
+fn transpose(m: [[f32; 4]; 4]) -> [[f32; 4]; 4] {
+    let mut r = [[0.0f32; 4]; 4];
+    for i in 0..4 {
+        for j in 0..4 {
+            r[i][j] = m[j][i];
+        }
+    }
+    r
+}
+
 fn perspective(fov_y: f32, aspect: f32, near: f32, far: f32) -> [[f32; 4]; 4] {
     let f = 1.0 / (fov_y * 0.5).tan();
-    [
-        [f / aspect, 0.0, 0.0, 0.0],
-        [0.0, f, 0.0, 0.0],
-        [0.0, 0.0, far / (near - far), -1.0],
-        [0.0, 0.0, (near * far) / (near - far), 0.0],
-    ]
+    let mut m = [[0.0f32; 4]; 4];
+    m[0][0] = f / aspect;
+    m[1][1] = f;
+    m[2][2] = far / (near - far);
+    m[2][3] = (near * far) / (near - far);
+    m[3][2] = -1.0;
+    m
 }
 
 fn rot_x(a: f32) -> [[f32; 4]; 4] {
     let (s, c) = a.sin_cos();
-    [[1.0, 0.0, 0.0, 0.0], [0.0, c, s, 0.0], [0.0, -s, c, 0.0], [0.0, 0.0, 0.0, 1.0]]
+    let mut m = identity();
+    m[1][1] = c;
+    m[1][2] = -s;
+    m[2][1] = s;
+    m[2][2] = c;
+    m
 }
 
 fn rot_y(a: f32) -> [[f32; 4]; 4] {
     let (s, c) = a.sin_cos();
-    [[c, 0.0, -s, 0.0], [0.0, 1.0, 0.0, 0.0], [s, 0.0, c, 0.0], [0.0, 0.0, 0.0, 1.0]]
+    let mut m = identity();
+    m[0][0] = c;
+    m[0][2] = s;
+    m[2][0] = -s;
+    m[2][2] = c;
+    m
 }
 
 fn translation(x: f32, y: f32, z: f32) -> [[f32; 4]; 4] {
-    [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [x, y, z, 1.0]]
+    let mut m = identity();
+    m[0][3] = x;
+    m[1][3] = y;
+    m[2][3] = z;
+    m
 }
 
 struct Gpu {
@@ -104,11 +147,13 @@ struct Gpu {
 impl Gpu {
     async fn new(window: Arc<Window>) -> Self {
         let size = window.inner_size();
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::VULKAN | wgpu::Backends::GL,
             ..Default::default()
         });
-        let surface = instance.create_surface(window).expect("create_surface failed");
+        let surface = instance
+            .create_surface(window)
+            .expect("create_surface failed");
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
@@ -116,9 +161,9 @@ impl Gpu {
                 force_fallback_adapter: false,
             })
             .await
-            .expect("no GPU adapter");
+            .expect("no suitable GPU adapter");
         let (device, queue) = adapter
-            .request_device(&wgpu::DeviceDescriptor::default())
+            .request_device(&wgpu::DeviceDescriptor::default(), None)
             .await
             .expect("request_device failed");
 
@@ -172,24 +217,23 @@ fn fs_main(in: VSOut) -> @location(0) vec4<f32> {
 
         let uniform_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("uniform"),
-            contents: bytemuck::cast_slice(&[Uniforms { mvp: [[0.0; 4]; 4] }]),
+            contents: bytemuck::cast_slice(&[Uniforms { mvp: identity() }]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("bgl"),
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }],
-            });
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("bgl"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+        });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("bg"),
@@ -231,7 +275,7 @@ fn fs_main(in: VSOut) -> @location(0) vec4<f32> {
             }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
-                cull_mode: Some(wgpu::Face::Back),
+                cull_mode: None,
                 ..Default::default()
             },
             depth_stencil: None,
@@ -281,8 +325,9 @@ fn fs_main(in: VSOut) -> @location(0) vec4<f32> {
         let view = mat_mul(rot_x(pitch), rot_y(yaw));
         let model = translation(-0.5, -0.5, -3.0);
         let mvp = mat_mul(mat_mul(proj, view), model);
+        let data = Uniforms { mvp: transpose(mvp) };
         self.queue
-            .write_buffer(&self.uniform_buf, 0, bytemuck::cast_slice(&[Uniforms { mvp }]));
+            .write_buffer(&self.uniform_buf, 0, bytemuck::cast_slice(&[data]));
 
         let frame = match self.surface.get_current_texture() {
             Ok(f) => f,
@@ -331,7 +376,13 @@ struct App {
 
 impl App {
     fn new() -> Self {
-        Self { window: None, gpu: None, yaw: 0.6, pitch: 0.5, last: None }
+        Self {
+            window: None,
+            gpu: None,
+            yaw: 0.6,
+            pitch: 0.5,
+            last: None,
+        }
     }
 }
 
@@ -358,7 +409,9 @@ impl ApplicationHandler for App {
                     g.resize(s.width, s.height);
                 }
             }
-            WindowEvent::Touch(Touch { phase, location, .. }) => {
+            WindowEvent::Touch(Touch {
+                phase, location, ..
+            }) => {
                 let (x, y) = (location.x, location.y);
                 match phase {
                     TouchPhase::Started => self.last = Some((x, y)),
@@ -394,19 +447,23 @@ impl ApplicationHandler for App {
     }
 }
 
+#[cfg(target_os = "android")]
 #[no_mangle]
-pub extern "C" fn android_main(_app: android_activity::AndroidApp) {
-    android_logger::init_once(
-        android_logger::Config::default().with_max_level(log::LevelFilter::Info),
-    );
-    let el = EventLoop::new().expect("EventLoop::new failed");
+pub extern "C" fn android_main(app: android_activity::AndroidApp) {
+    android_logger::init_once(android_logger::Config::default().with_max_level(log::LevelFilter::Info));
+    let mut builder = EventLoop::builder();
+    {
+        use winit::platform::android::EventLoopBuilderExtAndroid;
+        builder.with_android_app(app);
+    }
+    let event_loop = builder.build().expect("EventLoop::build failed");
     let mut a = App::new();
-    let _ = el.run_app(&mut a);
+    let _ = event_loop.run_app(&mut a);
 }
 
 #[cfg(not(target_os = "android"))]
 fn main() {
-    let el = EventLoop::new().expect("EventLoop::new failed");
+    let event_loop = EventLoop::new().expect("EventLoop::new failed");
     let mut a = App::new();
-    let _ = el.run_app(&mut a);
+    let _ = event_loop.run_app(&mut a);
 }
